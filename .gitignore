@@ -1,0 +1,5 @@
+*.[pP][dD][fF]
+/build/
+/install/
+/log/
+__pycache__/
