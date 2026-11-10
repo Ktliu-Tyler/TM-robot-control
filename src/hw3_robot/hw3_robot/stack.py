@@ -5,8 +5,7 @@ import numpy as np
 import rclpy
 from rclpy.node import Node
 from std_msgs.msg import String
-from tm_msgs.msg import FeedbackState
-from tm_msgs.srv import SendScript, SetIO
+
 
 
 def plan(cfg, frame):
@@ -54,11 +53,15 @@ def main():
     def feedback(msg):
         latest["state"] = msg
         latest["received"] = time.monotonic()
-    node.create_subscription(FeedbackState,"feedback_states",feedback,10)
+    if execute:
+        from tm_msgs.msg import FeedbackState
+        from tm_msgs.srv import SendScript, SetIO
+        node.create_subscription(FeedbackState,"feedback_states",feedback,10)
+        script = node.create_client(SendScript,"send_script")
+        io = node.create_client(SetIO,"set_io")
     node.create_subscription(String,"detect_blocks/result",
                              lambda msg: latest.update(frame=json.loads(msg.data)),10)
-    script = node.create_client(SendScript,"send_script")
-    io = node.create_client(SetIO,"set_io")
+
 
     def wait(check, seconds, label):
         deadline = time.monotonic()+seconds
@@ -103,7 +106,27 @@ def main():
     try:
         with open(path,encoding="utf-8-sig") as f:
             cfg = json.load(f)
+        for key, shape in [("camera_pose",(6,)), ("image_size",(2,)), ("stack_xy_mm",(2,))]:
+            values = np.asarray(cfg[key], dtype=float)
+            if values.shape != shape or not np.isfinite(values).all():
+                raise ValueError("Invalid field: "+key)
+        for key in ("grasp_z_mm","clear_z_mm","block_height_mm","jaw_offset_deg","stack_yaw_deg","gripper_settle_s"):
+            if not np.isfinite(cfg[key]):
+                raise ValueError("Invalid field: "+key)
+        if cfg["gripper_settle_s"] <= 0:
+            raise ValueError("Set the measured gripper settling time")
+        points = np.asarray(cfg["pixels"], dtype=float)
+        coords = np.asarray(cfg["base_xy_mm"], dtype=float)
+        if (points.ndim != 2 or points.shape[1] != 2 or len(points) < 4
+                or points.shape != coords.shape or not np.isfinite(points).all()
+                or not np.isfinite(coords).all() or cv2.findHomography(points,coords)[0] is None):
+            raise ValueError("Invalid top-plane correspondences")
+        if cfg["block_height_mm"] <= 0 or cfg["clear_z_mm"] <= cfg["grasp_z_mm"] + 3*cfg["block_height_mm"]:
+            raise ValueError("Invalid block height or clearance")
         if execute:
+            wait(lambda: "state" in latest, 5, "TM feedback")
+            if latest["state"].robot_error or latest["state"].e_stop or latest["state"].project_pause:
+                raise RuntimeError("TM reports fault, stop or pause")
             def move(target):
                 send('PTP("CPP",'+','.join(f"{v:.4f}" for v in target)+',10,200,0,false)')
                 wait(lambda: arrived(target),30,"target TCP")
@@ -132,3 +155,5 @@ def main():
     finally:
         node.destroy_node()
         rclpy.shutdown()
+
+

@@ -59,3 +59,5 @@ Controller pose convention used here is Rz(C) Ry(B) Rx(A). Tool IO is module 1/t
 The program checks pose arrival and service responses; grip success requires observation.
 After interruption inspect arm and stack before restarting with three blocks on the table.
 
+
+[Part E 中文上機手冊與架構](PART_E.md)

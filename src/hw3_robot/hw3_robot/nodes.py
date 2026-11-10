@@ -4,6 +4,7 @@ import numpy as np
 import rclpy
 from cv_bridge import CvBridge
 from rclpy.node import Node
+from rclpy.executors import ExternalShutdownException
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
@@ -16,11 +17,16 @@ def run(name, topic, encoding, process):
     node = Node(name)
     bridge = CvBridge()
     pub = node.create_publisher(String, name + "/result", 10)
+    options = {}
+    if name == "detect_blocks":
+        options["threshold"] = node.declare_parameter("threshold", 50).value
+        options["min_area"] = node.declare_parameter("min_area", 90).value
+        options["max_area"] = node.declare_parameter("max_area", 1000000).value
 
     def receive(msg):
         try:
             img = bridge.imgmsg_to_cv2(msg, desired_encoding=encoding)
-            result = process(img)
+            result = process(img, **options)
             payload = dict(frame=msg.header.frame_id, width=msg.width, height=msg.height,
                            stamp=[msg.header.stamp.sec, msg.header.stamp.nanosec], objects=result)
             pub.publish(String(data=json.dumps(payload, allow_nan=False)))
@@ -30,9 +36,11 @@ def run(name, topic, encoding, process):
     node.create_subscription(Image, topic, receive, qos_profile_sensor_data)
     try:
         rclpy.spin(node)
+    except (ExternalShutdownException, KeyboardInterrupt):
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
 
 
 def centers():
@@ -45,13 +53,13 @@ def poses():
     run("depth_poses", "aligned_depth", "16UC1", detect)
 
 
-def detect_blocks(img):
+def detect_blocks(img, threshold=50, min_area=90, max_area=1000000):
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, mask = cv2.threshold(gray, 50, 255, cv2.THRESH_BINARY)
+    _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
     contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
     objects = []
     for contour in contours:
-        if cv2.contourArea(contour) < 90:
+        if not min_area <= cv2.contourArea(contour) <= max_area:
             continue
         box = cv2.boxPoints(cv2.minAreaRect(contour))
         edges = np.roll(box,-1,axis=0)-box
@@ -83,6 +91,10 @@ def rectify():
     node.create_subscription(Image,"image_raw",receive,qos_profile_sensor_data)
     try:
         rclpy.spin(node)
+    except (ExternalShutdownException, KeyboardInterrupt):
+        pass
     finally:
         node.destroy_node()
-        rclpy.shutdown()
+        rclpy.try_shutdown()
+
+

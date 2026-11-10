@@ -1,0 +1,13 @@
+{
+  "camera_pose": [null,null,null,null,null,null],
+  "image_size": [null,null],
+  "pixels": [],
+  "base_xy_mm": [],
+  "stack_xy_mm": [null,null],
+  "grasp_z_mm": null,
+  "clear_z_mm": null,
+  "block_height_mm": null,
+  "jaw_offset_deg": null,
+  "stack_yaw_deg": null,
+  "gripper_settle_s": null
+}
