@@ -9,7 +9,7 @@ Rename team_ws to team<number>_ws for submission. From the workspace root:
 
 ## A / C / D
 
-Run camera_calibration.py from HW_A. Copy the generated part_a_camera.npz to the ROS machine.
+Run `python camera_calibration.py` from [HW_A](HW_A/) with NumPy and OpenCV installed to reproduce the calibration. The original images, corrected examples and [camera parameters](HW_A/part_a_camera.npz) are included.
 For that same camera, resolution and landscape orientation:
 
     ros2 run hw3_robot rectify_image --ros-args -p calibration:=/absolute/path/part_a_camera.npz
@@ -58,3 +58,4 @@ tool_pose in metres and radians with the same base and TCP; verify on the lab dr
 Controller pose convention used here is Rz(C) Ry(B) Rx(A). Tool IO is module 1/type 1/pin 0.
 The program checks pose arrival and service responses; grip success requires observation.
 After interruption inspect arm and stack before restarting with three blocks on the table.
+
