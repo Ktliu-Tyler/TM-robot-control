@@ -1,5 +1,25 @@
 # HW3 ROS 2 workspace
 
+## Standalone homework scripts (submission/)
+
+Submission copies of the Part B-D scripts; they only need opencv-python and numpy
+(submission/requirements.txt). Part A is HW_A/camera_calibration.py (see A / C / D
+below); submit it as hw3_a.py. TA is the folder unpacked from the TA's hw3.zip
+(with b/, c/, d/ inside):
+
+    python3 submission/hw3_b.py TA/b/cubes.png                 # Part B: centroid + principal angle
+    python3 submission/hw3_c.py TA/b/cubes.png TA/c/depth.png  # Part C: uses Part B's detector
+    python3 submission/hw3_c.py TA/c/depth.png                 # Part C: depth-only fallback
+    python3 submission/hw3_d.py TA/d/cubes.png TA/d/depth.png  # Part D: 6D pose (bonus)
+
+hw3_c.py imports hw3_b.py from the same folder, so Part B and Part C share object IDs
+(--depth-only keeps the original depth segmentation). hw3_d.py fits a cube model to the
+color outlines and top faces on the depth table plane; it places the principal point at
+the image center because Part C's (286.54, 151.36) lies outside the 240 x 240 Part D
+image (--partc-K uses Part C's matrix unchanged). The package copies in
+src/hw3_robot/hw3_robot are identical; keep them in sync, e.g.
+cmp submission/hw3_d.py src/hw3_robot/hw3_robot/hw3_d.py.
+
 Build on the lab ROS 2 computer with its TM driver and tm_msgs overlay sourced.
 Rename team_ws to team<number>_ws for submission. From the workspace root:
 
@@ -15,16 +35,19 @@ For that same camera, resolution and landscape orientation:
     ros2 run hw3_robot rectify_image --ros-args -p calibration:=/absolute/path/part_a_camera.npz
 
 image_raw -> image_rect preserves the calibration pixel grid (no ROI crop).
-depth_centers and depth_poses subscribe to aligned_depth (16UC1, mm). Start either with
-ros2 run hw3_robot followed by its name. Results on depth_centers/result or
-depth_poses/result carry the input stamp and optical frame. The two nodes use
-the assignment RGB-D intrinsics and target the C and D scenes respectively.
-The packaged hw3_c.py and hw3_d.py are snapshots: sync them after editing the standalone versions.
+depth_centers subscribes to aligned_depth (16UC1, mm). depth_poses subscribes to a
+synchronized color image and aligned depth (parameters color_topic, default color_image,
+and depth_topic, default aligned_depth); intrinsics come from parameters fx, fy, cx, cy
+(cx/cy below 0 mean the image center). Start either with ros2 run hw3_robot followed by
+its name. Results on depth_centers/result or depth_poses/result carry the input stamp and
+optical frame; depth_poses angles use R = Rx(roll) Ry(pitch) Rz(yaw).
+The packaged hw3_b.py, hw3_c.py and hw3_d.py are copies of submission/.
 
 ## E / fixed-view tabletop calibration
 
 Start the TM Listen project, ROS driver, image publisher and feedback stream. The detector
-assumes separate brighter blocks on a dark background. Inspect detect_blocks/result on
+is Part B's (hw3_b.detect_objects: automatic triangle threshold, noise removal, edge-aligned
+angle for square blocks) and assumes separate brighter blocks on a dark background. Inspect detect_blocks/result on
 lab images before motion. Each detection holds a pixel centroid and a second point along
 a block edge. The stacker transforms both points to base XY to determine jaw yaw.
 
