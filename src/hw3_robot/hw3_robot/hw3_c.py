@@ -1,23 +1,34 @@
 #!/usr/bin/env python3
-"""Robotics HW3 Part C: independently estimate 3D cube centers from aligned depth.
+"""Robotics HW3 Part C: estimate 3D cube centers from aligned depth.
 
 Normal submission usage:
     python hw3_c.py cubes.png depth.png
+
+With cubes.png, the cubes and their centroids come from Part B's detector
+(hw3_b.py, same folder or same package), so Part B and Part C share IDs; Z is
+the median valid depth inside each cube's region.  Without hw3_b.py, or with
+--depth-only, the depth segmentation below is used instead.
 
 Depth-only development/testing (when Part B's RGB file is not yet available):
     python hw3_c.py depth.png
 
 The depth segmentation below is intentionally tuned to the supplied HW3-C scene:
 table at approximately 590-595 mm and cube tops at approximately 566-568 mm.
-It is NOT a general object detector; replace find_centers_from_depth() with the
-Part B RGB object detector if you need to handle different scenes.
+It is NOT a general object detector.
 """
-from __future__ import annotations
 import argparse
 from pathlib import Path
 
 import cv2
 import numpy as np
+
+try:  # inside the hw3_robot ROS package
+    from .hw3_b import detect_objects
+except (ImportError, SystemError, ValueError):
+    try:  # standalone: hw3_b.py in the same folder
+        from hw3_b import detect_objects
+    except ImportError:
+        detect_objects = None
 
 # Provided by the instructor for the RGB-D sample images (not from Part A).
 FX = 613.57
@@ -64,6 +75,26 @@ def find_centers_from_depth(depth: np.ndarray, min_area: int = 100,
     return objects, mask, table_depth, threshold_mm
 
 
+def find_centers_from_rgb(rgb: np.ndarray, depth: np.ndarray):
+    """Cubes and centroids from Part B's detector; Z = median valid depth
+    inside each cube's region. Keeps Part B's IDs."""
+    found, binary, _ = detect_objects(rgb)
+    objects = []
+    for obj in found:
+        region = np.zeros(depth.shape, np.uint8)
+        cv2.drawContours(region, [obj["contour"]], -1, 255, thickness=cv2.FILLED)
+        object_depth = depth[(region > 0) & (depth > 0)]
+        if object_depth.size == 0:
+            continue
+        u, v = obj["centroid"]
+        z = float(np.median(object_depth))  # depth.png is in millimeters
+        x = (u - CX) * z / FX
+        y = (v - CY) * z / FY
+        objects.append(dict(u=u, v=v, x=x, y=y, z=z, area=int(obj["area"]),
+                            id=obj["id"]))
+    return objects, binary
+
+
 def depth_visualization(depth: np.ndarray) -> np.ndarray:
     valid = depth[depth > 0]
     lo, hi = np.percentile(valid, [1, 99])
@@ -83,7 +114,7 @@ def draw_results(background: np.ndarray, objects) -> np.ndarray:
         px, py = round(obj["u"] * 2), round(obj["v"] * 2)
         cv2.circle(out, (px, py), 6, (255, 255, 255), 2, cv2.LINE_AA)
         cv2.circle(out, (px, py), 3, (0, 0, 255), -1, cv2.LINE_AA)
-        label = (f'ID{index}: ({obj["x"]:.1f}, {obj["y"]:.1f}, '
+        label = (f'ID{obj.get("id", index)}: ({obj["x"]:.1f}, {obj["y"]:.1f}, '
                  f'{obj["z"]:.0f}) mm')
         (tw, th), baseline = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX,
                                                0.48, 1)
@@ -102,6 +133,8 @@ def main():
                         help="depth.png OR cubes.png depth.png")
     parser.add_argument("-o", "--output", default="part_c_result.png",
                         help="Annotated result image")
+    parser.add_argument("--depth-only", action="store_true",
+                        help="Find cubes from depth even when cubes.png is given")
     args = parser.parse_args()
     if len(args.images) == 1:
         rgb_path = None
@@ -124,7 +157,12 @@ def main():
         if background.shape[:2] != depth.shape:
             raise ValueError("RGB and depth must be aligned and have same dimensions.")
 
-    objects, mask, table, threshold = find_centers_from_depth(depth)
+    use_rgb = (rgb_path is not None and detect_objects is not None
+               and not args.depth_only)
+    if use_rgb:
+        objects, mask = find_centers_from_rgb(background, depth)
+    else:
+        objects, mask, table, threshold = find_centers_from_depth(depth)
     if not objects:
         raise RuntimeError("No objects detected. Check the depth image and threshold.")
     output = draw_results(background, objects)
@@ -132,11 +170,15 @@ def main():
     cv2.imwrite(str(Path(args.output).with_name('part_c_mask.png')), mask)
 
     print(f"Depth shape: {depth.shape[1]} x {depth.shape[0]}, uint16, mm")
-    print(f"Estimated table: {table:.1f} mm; object threshold: < {threshold:.1f} mm")
+    if use_rgb:
+        print("Cubes and centroids: Part B detector (hw3_b.py); "
+              "Z: median depth inside each cube")
+    else:
+        print(f"Estimated table: {table:.1f} mm; object threshold: < {threshold:.1f} mm")
     print("Coordinates are in CAMERA frame (X right, Y down, Z forward)")
     print(" ID | pixel(u,v)       | X(mm)    Y(mm)    Z(mm)")
     for i, obj in enumerate(objects):
-        print(f'{i:3d} | ({obj["u"]:6.1f},{obj["v"]:6.1f}) | '
+        print(f'{obj.get("id", i):3d} | ({obj["u"]:6.1f},{obj["v"]:6.1f}) | '
               f'{obj["x"]:7.1f} {obj["y"]:8.1f} {obj["z"]:8.1f}')
     print(f"Saved: {args.output}, part_c_mask.png")
 
