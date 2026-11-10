@@ -47,8 +47,8 @@ The planar mapping applies to this single capture pose and equal-height upright 
 | jaw_offset_deg, stack_yaw_deg | measured jaw-to-edge yaw correction and release yaw |
 | gripper_settle_s | measured open/close time plus settling margin |
 
-    ros2 run hw3_robot detect_blocks
-    ros2 run hw3_robot stack_blocks --ros-args -p calibration:=/absolute/path/lab.json
+    ros2 run hw3_robot image_sub
+    ros2 run hw3_robot send_script --ros-args -p calibration:=/absolute/path/lab.json
 
 For this preview trigger a new job1 image from the fixed pose. Check all printed waypoints.
 On hardware, start at a verified clear approach and run the same stack_blocks command with
@@ -61,3 +61,4 @@ After interruption inspect arm and stack before restarting with three blocks on 
 
 
 [Part E 中文上機手冊與架構](PART_E.md)
+

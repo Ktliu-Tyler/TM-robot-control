@@ -8,6 +8,20 @@ from std_msgs.msg import String
 
 
 
+# Fill with measured lab values, or supply a JSON file via the calibration parameter.
+LAB = {'camera_pose': [None, None, None, None, None, None],
+       'image_size': [None, None],
+       'pixels': [],
+       'base_xy_mm': [],
+       'stack_xy_mm': [None, None],
+       'grasp_z_mm': None,
+       'clear_z_mm': None,
+       'block_height_mm': None,
+       'jaw_offset_deg': None,
+       'stack_yaw_deg': None,
+       'gripper_settle_s': None}
+
+
 def plan(cfg, frame):
     uv = np.asarray(cfg["pixels"], np.float32)
     xy = np.asarray(cfg["base_xy_mm"], np.float32)
@@ -46,7 +60,7 @@ def plan(cfg, frame):
 
 def main():
     rclpy.init()
-    node = Node("stack_blocks")
+    node = Node("send_script_client")
     execute = node.declare_parameter("execute",False).value
     path = node.declare_parameter("calibration","").value
     latest = {}
@@ -104,8 +118,10 @@ def main():
         call(script,request)
 
     try:
-        with open(path,encoding="utf-8-sig") as f:
-            cfg = json.load(f)
+        cfg = LAB
+        if path:
+            with open(path,encoding="utf-8-sig") as f:
+                cfg = json.load(f)
         for key, shape in [("camera_pose",(6,)), ("image_size",(2,)), ("stack_xy_mm",(2,))]:
             values = np.asarray(cfg[key], dtype=float)
             if values.shape != shape or not np.isfinite(values).all():
@@ -157,3 +173,7 @@ def main():
         rclpy.shutdown()
 
 
+
+
+if __name__ == "__main__":
+    main()

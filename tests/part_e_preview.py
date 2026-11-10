@@ -52,9 +52,9 @@ def main():
         path = Path(temp)/"fixture.json"
         path.write_text(json.dumps(cfg))
         prefix = ["ros2","run","hw3_robot"]
-        detector = subprocess.Popen(prefix+["detect_blocks"], start_new_session=True)
+        detector = subprocess.Popen(prefix+["image_sub"], start_new_session=True)
         try:
-            with subprocess.Popen(prefix+["stack_blocks","--ros-args","-p",f"calibration:={path}", "-p", "execute:="+str(mock).lower()],
+            with subprocess.Popen(prefix+["send_script","--ros-args","-p",f"calibration:={path}", "-p", "execute:="+str(mock).lower()],
                                   stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True) as controller:
                 deadline = time.monotonic()+30
                 while controller.poll() is None and time.monotonic()<deadline:

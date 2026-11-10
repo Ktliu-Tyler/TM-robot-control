@@ -1,5 +1,10 @@
 # Part E 上機手冊
 
+## 老師的兩檔部署方式
+
+若已依講義建立並註冊 send_script 套件，把 repo 內 src/hw3_robot/hw3_robot/ 的 image_sub.py 與 send_script.py 複製到 ~/workspace2/teamX_ws/src/send_script/send_script/，覆蓋兩支範例。在 send_script.py 的 LAB 字典填寫下方校正值，或用 calibration 參數提供外部 JSON。兩檔都提供 main()，只需實驗室 ROS、cv_bridge、OpenCV、NumPy 和 tm_msgs。回 teamX_ws 重新 colcon build 並 source install/setup.bash。
+
+依序啟動 RosNode、老師的 tm_driver、tm_get_status image_talker，再分終端執行 ros2 run send_script image_sub 和 ros2 run send_script send_script。預覽時在固定姿態另外觸發 job1；實抓加 --ros-args -p execute:=true。下方 hw3_robot 是使用本 repo 套件時的名稱。
 ## 資料流與座標
 
 ```text
@@ -44,9 +49,9 @@ ros2 topic echo /feedback_states --once
 終端一啟動辨識，終端二啟動下列預覽；接著從控制器在已校正姿態拍攝新圖：
 
 ```bash
-ros2 run hw3_robot detect_blocks
+ros2 run hw3_robot image_sub
 # 另一個已 source 的終端
-ros2 run hw3_robot stack_blocks --ros-args -p calibration:="$PWD/lab.json"
+ros2 run hw3_robot send_script --ros-args -p calibration:="$PWD/lab.json"
 ```
 
 預覽只列出 IO 和 TCP 指令。用 `ros2 topic echo /detect_blocks/result --once` 核對恰有三個中心，各自落在不同積木。若桌面也被辨識，先改用深色霧面底板、均勻照明，再重拍。若逾時，檢查 topic、job 名稱與 header.stamp。比對預覽的每一組座標、角度、堆放高度及手臂可達範圍。先用示教器在積木上方核對 XY、夾爪方向，再檢查下降與離開路徑。
@@ -54,7 +59,7 @@ ros2 run hw3_robot stack_blocks --ros-args -p calibration:="$PWD/lab.json"
 確認無人進入工作範圍，由現場操作員掌握停止裝置，從已驗證的起始姿態執行：
 
 ```bash
-ros2 run hw3_robot stack_blocks --ros-args -p calibration:="$PWD/lab.json" -p execute:=true
+ros2 run hw3_robot send_script --ros-args -p calibration:="$PWD/lab.json" -p execute:=true
 ```
 
 控制節點移至拍照姿態，觸發 job1，等待新圖，產生整輪計畫。每塊依序靠近、下降、閉爪、升起、移至堆疊區、下降、開爪、升起。第 2、3 層的放置高度各增加一個塊高。移動後以回授確認到位，IO 以服務回覆與實測等待時間同步。無夾持感測；若落空、滑落、積木被推動或出現異常，立即依現場程序停機，重置場景再重新拍照。正式錄影從空桌開始，拍到手動隨機撒入三塊及完整堆疊過程。
@@ -73,7 +78,8 @@ python3 tests/part_e_preview.py --mock-tm
 回到實機時使用新的終端並恢復實驗室的 ROS domain 與網路設定。辨識漏掉深色積木時可降低 threshold；桌面雜點太多時提高 min_area，大面積背景則降低 max_area。請先用實拍影像估計積木面積，例如用以下語法覆寫節點預設值，再重跑預覽。
 
 ```bash
-ros2 run hw3_robot detect_blocks --ros-args -p threshold:=50 -p min_area:=90 -p max_area:=1000000
+ros2 run hw3_robot image_sub --ros-args -p threshold:=50 -p min_area:=90 -p max_area:=1000000
 ```
 
 本次在 Ubuntu-D、ROS 2 Humble，以 Techman 官方 tmr_ros2 的 humble 分支（c40bfc0）建置 tm_msgs。模擬測試驗證拍照姿態、job1、三輪抓放、三個堆疊高度與七次 IO；模擬器直接回報指令目標，未模擬路徑、接觸或夾力。[官方驅動與啟動說明](https://github.com/TechmanRobotInc/tmr_ros2/tree/humble)
+

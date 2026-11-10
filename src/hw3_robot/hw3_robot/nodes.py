@@ -17,16 +17,10 @@ def run(name, topic, encoding, process):
     node = Node(name)
     bridge = CvBridge()
     pub = node.create_publisher(String, name + "/result", 10)
-    options = {}
-    if name == "detect_blocks":
-        options["threshold"] = node.declare_parameter("threshold", 50).value
-        options["min_area"] = node.declare_parameter("min_area", 90).value
-        options["max_area"] = node.declare_parameter("max_area", 1000000).value
-
     def receive(msg):
         try:
             img = bridge.imgmsg_to_cv2(msg, desired_encoding=encoding)
-            result = process(img, **options)
+            result = process(img)
             payload = dict(frame=msg.header.frame_id, width=msg.width, height=msg.height,
                            stamp=[msg.header.stamp.sec, msg.header.stamp.nanosec], objects=result)
             pub.publish(String(data=json.dumps(payload, allow_nan=False)))
@@ -53,26 +47,6 @@ def poses():
     run("depth_poses", "aligned_depth", "16UC1", detect)
 
 
-def detect_blocks(img, threshold=50, min_area=90, max_area=1000000):
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, mask = cv2.threshold(gray, threshold, 255, cv2.THRESH_BINARY)
-    contours = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)[-2]
-    objects = []
-    for contour in contours:
-        if not min_area <= cv2.contourArea(contour) <= max_area:
-            continue
-        box = cv2.boxPoints(cv2.minAreaRect(contour))
-        edges = np.roll(box,-1,axis=0)-box
-        edge = edges[np.argmax(np.linalg.norm(edges,axis=1))]
-        moments = cv2.moments(contour)
-        center = np.array([moments["m10"],moments["m01"]])/moments["m00"]
-        objects.append([center.tolist(), (center+edge/2).tolist()])
-    return objects
-
-
-def blocks():
-    run("detect_blocks","techman_image","bgr8",detect_blocks)
-
 def rectify():
     rclpy.init()
     node = Node("rectify_image")
@@ -96,5 +70,6 @@ def rectify():
     finally:
         node.destroy_node()
         rclpy.try_shutdown()
+
 
 
