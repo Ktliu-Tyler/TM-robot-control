@@ -10,7 +10,7 @@ stack_blocks → send_script (tm_msgs/SendScript) → TM Listen → TCP 移動�
 stack_blocks → set_io (tm_msgs/SetIO) → 工具端 DO 0 → 夾爪
 ```
 
-相機固定在手腕上，每輪在相同 TCP 姿態拍一張照片。辨識節點對灰階影像以 50 二值化，保留面積至少 90 px² 的輪廓。每個物件輸出重心與最小外接矩形長邊的方向點。控制節點對兩點分別做平面單應轉換，再在底座 XY 平面求角度。此法適用於等高、平放且分開的積木；換相機姿態、TCP、解析度或積木高度須重校。C 的深度圖與 A 的自選相機內參都不是此流程的輸入。
+相機固定在手腕上，每輪在相同 TCP 姿態拍一張照片。辨識節點用 Part B 的偵測（hw3_b.detect_objects）：灰階影像以 triangle 法自動選門檻二值化（threshold 參數設正數則改用固定門檻），去雜點後保留面積至少 90 px² 的區域。每個物件輸出重心，以及沿積木邊、離重心半個邊長的方向點（正方形積木取最小外接矩形的邊方向）。控制節點對兩點分別做平面單應轉換，再在底座 XY 平面求角度。此法適用於等高、平放且分開的積木；換相機姿態、TCP、解析度或積木高度須重校。C 的深度圖與 A 的自選相機內參都不是此流程的輸入。
 
 ## 1　準備設備與 ROS
 
@@ -70,10 +70,10 @@ python3 tests/part_e_preview.py
 python3 tests/part_e_preview.py --mock-tm
 ```
 
-回到實機時使用新的終端並恢復實驗室的 ROS domain 與網路設定。辨識漏掉深色積木時可降低 threshold；桌面雜點太多時提高 min_area，大面積背景則降低 max_area。請先用實拍影像估計積木面積，例如用以下語法覆寫節點預設值，再重跑預覽。
+回到實機時使用新的終端並恢復實驗室的 ROS domain 與網路設定。預設 threshold:=0 為自動門檻；自動門檻不理想時改用固定值，辨識漏掉深色積木時降低 threshold；桌面雜點太多時提高 min_area，大面積背景則降低 max_area。請先用實拍影像估計積木面積，例如用以下語法覆寫節點預設值，再重跑預覽。
 
 ```bash
-ros2 run hw3_robot detect_blocks --ros-args -p threshold:=50 -p min_area:=90 -p max_area:=1000000
+ros2 run hw3_robot detect_blocks --ros-args -p threshold:=0 -p min_area:=90 -p max_area:=1000000
 ```
 
 本次在 Ubuntu-D、ROS 2 Humble，以 Techman 官方 tmr_ros2 的 humble 分支（c40bfc0）建置 tm_msgs。模擬測試驗證拍照姿態、job1、三輪抓放、三個堆疊高度與七次 IO；模擬器直接回報指令目標，未模擬路徑、接觸或夾力。[官方驅動與啟動說明](https://github.com/TechmanRobotInc/tmr_ros2/tree/humble)
