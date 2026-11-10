@@ -45,6 +45,9 @@ def main():
     node.create_subscription(Image, "techman_image", receive, qos_profile_sensor_data)
     try:
         rclpy.spin(node)
+    except Exception:
+        if rclpy.ok():
+            raise
     except KeyboardInterrupt:
         pass
     finally:
@@ -55,3 +58,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
