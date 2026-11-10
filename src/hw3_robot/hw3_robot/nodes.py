@@ -4,13 +4,28 @@ import numpy as np
 import rclpy
 from cv_bridge import CvBridge
 from rclpy.node import Node
-from rclpy.executors import ExternalShutdownException
+try:  # ROS 2 Foxy and later; the TA's lab tutorial runs Dashing (Python 3.6)
+    from rclpy.executors import ExternalShutdownException
+except ImportError:
+    class ExternalShutdownException(Exception):
+        pass
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from std_msgs.msg import String
 from .hw3_b import detect_objects
 from .hw3_c import find_centers_from_depth
 from . import hw3_d
+
+
+def _shutdown():
+    """rclpy.try_shutdown() where available (Humble), plain shutdown on Dashing."""
+    if hasattr(rclpy, "try_shutdown"):
+        rclpy.try_shutdown()
+        return
+    try:
+        rclpy.shutdown()
+    except Exception:
+        pass
 
 
 def run(name, topic, encoding, process):
@@ -42,7 +57,7 @@ def run(name, topic, encoding, process):
         pass
     finally:
         node.destroy_node()
-        rclpy.try_shutdown()
+        _shutdown()
 
 
 def centers():
@@ -88,7 +103,7 @@ def poses():
         pass
     finally:
         node.destroy_node()
-        rclpy.try_shutdown()
+        _shutdown()
 
 
 def detect_blocks(img, threshold=0, min_area=90, max_area=1000000):
@@ -134,6 +149,6 @@ def rectify():
         pass
     finally:
         node.destroy_node()
-        rclpy.try_shutdown()
+        _shutdown()
 
 
